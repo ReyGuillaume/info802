@@ -15,7 +15,7 @@ app.post('/calculTempsTrajet', (req, res) => {
     client.calculTempsTrajet(args, (err, result) => {
       if (err) {
         console.error('Error :', err);
-        res.status(500).send(err);
+        res.status(500).json({ error: err });
         return;
       }
 
@@ -32,8 +32,6 @@ app.post('/borneAProximite', (req, res) => {
   }
 
   const url = `https://odre.opendatasoft.com/api/explore/v2.1/catalog/datasets/bornes-irve/records?` +
-    `where = xlongitude >= ${encodeURIComponent(xlongitude - 0.2)} AND xlongitude <= ${encodeURIComponent(xlongitude + 0.2)} ` +
-    `AND ylatitude >= ${encodeURIComponent(ylatitude - 0.2)} AND ylatitude <= ${encodeURIComponent(ylatitude + 0.2)}` +
     `& order_by = ${encodeURIComponent(`(xlongitude-${xlongitude})*(xlongitude-${xlongitude})+(ylatitude-${ylatitude})*(ylatitude-${ylatitude})`)} ASC` +
     `& limit = 1`;
 
@@ -49,8 +47,50 @@ app.post('/borneAProximite', (req, res) => {
       res.json(data);
     })
     .catch((error) => {
-      res.status(500).json({ error: 'Erreur lors de la récupération des données.', details: error.message });
+      console.error('Error :', error);
+      res.status(500).json({ error: error.message });
     });
+});
+
+app.post('/obtenirCoordonnees', (req, res) => {
+  const { address } = req.body;
+
+  fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(address)}&format=json`)
+    .then((response) => response.json())
+    .then((data) => {
+      if (data.length > 0) {
+        res.json(data[0]);
+      } else {
+        return res.status(400).json({ error: 'Aucun resultat trouvé.' });
+      }
+    })
+    .catch((error) => {
+      console.error('Error :', error);
+      res.status(500).json({ error });
+    });
+});
+
+app.post('/obtenirItineraire', async (req, res) => {
+  const { pointList } = req.body;
+
+  if (pointList.length < 2) {
+    return res.status(400).json({ error: 'L\'itineraire doit contenir au moins un départ et une arrivée' });
+  }
+
+  const route = [];
+
+  for (let i = 0; i < pointList.length - 1; i++) {
+    const point1 = pointList[i];
+    const point2 = pointList[i+1];
+
+    const request = await fetch(`http://router.project-osrm.org/route/v1/driving/${point1.lon},${point1.lat};${point2.lon},${point2.lat}?overview=full&geometries=geojson`)
+    const result = await request.json()
+    
+    const coordinates = result.routes[0].geometry.coordinates;
+    coordinates.map(coord => route.push([coord[1], coord[0]]));
+  }
+
+  res.json(route);
 });
 
 const PORT = 3000;
