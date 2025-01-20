@@ -10,10 +10,14 @@ app.use(express.json());
 const wsdlUrl = 'http://127.0.0.1:8000/?wsdl';
 
 app.post('/calculTempsTrajet', (req, res) => {
-  const args = req.body;
+  const {depart, arrivee, autonomie, chargement} = req.body;
+  const distance = geolib.getDistance(
+    { latitude: depart.lat, longitude: depart.lon },
+    { latitude: arrivee.lat, longitude: arrivee.lon }
+  );
 
   soap.createClient(wsdlUrl, (_, client) => {
-    client.calculTempsTrajet(args, (err, result) => {
+    client.calculTempsTrajet({distance, autonomie, chargement}, (err, result) => {
       if (err) {
         console.error('Error :', err);
         res.status(500).json({ error: err });
@@ -122,6 +126,14 @@ const query = `
           thumbnail_url
         }
       }
+      range {
+        chargetrip_range {
+          best
+        }
+      }
+      connectors {
+        time
+      }
     }
   }
 `;
@@ -166,7 +178,7 @@ async function borneAProximite(lon, lat) {
   return data.results[0];
 }
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`API running on http://localhost:${PORT}`);
 });
