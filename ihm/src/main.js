@@ -1,7 +1,7 @@
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
-const apiUrl = 'https://info-802-ihm.web.app';
+const apiUrl = 'https://info-802-api.web.app';
 
 const button = document.getElementById('button');
 const depart = document.getElementById('depart');
@@ -150,22 +150,14 @@ function displayVehicules(vehicleList) {
 }
 
 async function calculData(depart, arrivee, autonomie, chargement, pointList, consommation, prixEnergie) {
-  const data = { depart, arrivee, autonomie, chargement };
-  let request = await fetch(`${apiUrl}/calculTempsTrajet`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  });
-  const res1 = await request.json();
+  resume.innerHTML = '';
 
-  request = await fetch(`${apiUrl}/calculerCout`, {
+  let request = await fetch(`${apiUrl}/calculerCout`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({pointList, consommation, prixEnergie}),
   });
   const res2 = await request.json();
-
-  resume.innerHTML = '';
 
   const title = document.createElement('h3');
   title.textContent = 'Résumé';
@@ -179,10 +171,6 @@ async function calculData(depart, arrivee, autonomie, chargement, pointList, con
   charg.textContent = 'Vitesse chargement: ' + chargement + 'min';
   resume.appendChild(charg)
 
-  const tmps = document.createElement('p');
-  tmps.textContent = 'Temps trajet: ' + (res1.calculTempsTrajetResult.integer[0] / 1000).toFixed(2) + 'min';
-  resume.appendChild(tmps)
-
   const dist = document.createElement('p');
   dist.textContent = 'Distance totale: ' + res2.distanceTotale + 'km';
   resume.appendChild(dist)
@@ -190,4 +178,19 @@ async function calculData(depart, arrivee, autonomie, chargement, pointList, con
   const cout = document.createElement('p');
   cout.textContent = 'Cout trajet: ' + res2.coutTotal + '€';
   resume.appendChild(cout)
+
+  const tmps = document.createElement('p');
+  try {
+    const data = { depart, arrivee, autonomie, chargement };
+    request = await fetch(`${apiUrl}/calculTempsTrajet`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    const res1 = await request.json();
+    tmps.textContent = 'Temps trajet: ' + (res1.calculTempsTrajetResult.integer[0] / 1000).toFixed(2) + 'min';
+  } catch(e) {
+    tmps.textContent = 'Soap service error...';
+  }
+  resume.appendChild(tmps)
 }
