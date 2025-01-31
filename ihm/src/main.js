@@ -1,7 +1,7 @@
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
-const apiUrl = 'http://localhost:3000';
+const apiUrl = 'https://info-802-ihm.web.app';
 
 const button = document.getElementById('button');
 const depart = document.getElementById('depart');
@@ -32,12 +32,11 @@ button.addEventListener('click', async () => {
 
   const coordonneeDepart = await fetchCoordinate(depart.value);
   const coordonneeArrivee = await fetchCoordinate(arrivee.value);
-  const autonomieVehicule = vehicleSelected.range.chargetrip_range.best;
-
-  calculTempsTrajet(coordonneeDepart, coordonneeArrivee, vehicleSelected.range.chargetrip_range.best, vehicleSelected.connectors[0].time);
-
+  const autonomieVehicule = vehicleSelected.autonomieMoyenne;
   const points = await pointsIntermediaires(coordonneeDepart, coordonneeArrivee, autonomieVehicule);
   const pointList = [coordonneeDepart, ...points, coordonneeArrivee];
+
+  calculData(coordonneeDepart, coordonneeArrivee, autonomieVehicule, vehicleSelected.tempsChargement, pointList, vehicleSelected.consommationMoyenne, 1.2);
 
   try {
     const request = await fetch(`${apiUrl}/obtenirItineraire`, {
@@ -103,9 +102,19 @@ fetch(`${apiUrl}/obtenirVehicules`, {
   headers: { 'Content-Type': 'application/json' },
 })
   .then((res) => res.json())
-  .then(({vehicleList}) => {
+  .then((vehicleList) => {
     displayVehicules(vehicleList);
   });
+
+/* Vehicle : {
+  id,
+  make,
+  model,
+  autonomieMoyenne,
+  consommationMoyenne,
+  thumbnail_url,
+  tempsChargement,
+} */
 
 function displayVehicules(vehicleList) {
   vehicleList.forEach(vehicle => {
@@ -117,37 +126,44 @@ function displayVehicules(vehicleList) {
     })
 
     const title = document.createElement('h3');
-    title.textContent = vehicle.naming.make;
+    title.textContent = vehicle.make;
     elt.appendChild(title)
 
     const subtitle = document.createElement('p');
-    subtitle.textContent = vehicle.naming.model;
+    subtitle.textContent = vehicle.model;
     elt.appendChild(subtitle)
 
     const autonomie = document.createElement('p');
-    autonomie.textContent = "Autonmie : " + vehicle.range.chargetrip_range.best + "km";
+    autonomie.textContent = "Autonmie : " + vehicle.autonomieMoyenne + "km";
     elt.appendChild(autonomie)
 
     const recharge = document.createElement('p');
-    recharge.textContent = "Temps recharge : " + vehicle.connectors[0].time + "min";
+    recharge.textContent = "Temps recharge : " + vehicle.tempsChargement + "min";
     elt.appendChild(recharge)
 
     const image = document.createElement('img');
-    image.src = vehicle.media.image.thumbnail_url;
+    image.src = vehicle.thumbnail_url;
     elt.appendChild(image)
 
     list.appendChild(elt)
   });
 }
 
-async function calculTempsTrajet(depart, arrivee, autonomie, chargement) {
+async function calculData(depart, arrivee, autonomie, chargement, pointList, consommation, prixEnergie) {
   const data = { depart, arrivee, autonomie, chargement };
-  const request = await fetch(`${apiUrl}/calculTempsTrajet`, {
+  let request = await fetch(`${apiUrl}/calculTempsTrajet`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(data),
   });
-  const res = await request.json();
+  const res1 = await request.json();
+
+  request = await fetch(`${apiUrl}/calculerCout`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({pointList, consommation, prixEnergie}),
+  });
+  const res2 = await request.json();
 
   resume.innerHTML = '';
 
@@ -160,8 +176,18 @@ async function calculTempsTrajet(depart, arrivee, autonomie, chargement) {
   resume.appendChild(auto)
 
   const charg = document.createElement('p');
-  charg.textContent = 'Vitesse chargement: ' + chargement + 'km';
+  charg.textContent = 'Vitesse chargement: ' + chargement + 'min';
   resume.appendChild(charg)
 
-  return res.calculTempsTrajetResult.integer[0];
+  const tmps = document.createElement('p');
+  tmps.textContent = 'Temps trajet: ' + (res1.calculTempsTrajetResult.integer[0] / 1000).toFixed(2) + 'min';
+  resume.appendChild(tmps)
+
+  const dist = document.createElement('p');
+  dist.textContent = 'Distance totale: ' + res2.distanceTotale + 'km';
+  resume.appendChild(dist)
+
+  const cout = document.createElement('p');
+  cout.textContent = 'Cout trajet: ' + res2.coutTotal + '€';
+  resume.appendChild(cout)
 }
