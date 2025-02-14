@@ -1,7 +1,8 @@
 import 'leaflet/dist/leaflet.css';
 import L from 'leaflet';
 
-const apiUrl = 'https://info-802-api.web.app';
+// const apiUrl = 'https://info-802-api.web.app';
+const apiUrl = 'http://127.0.0.1:5000';
 
 const button = document.getElementById('button');
 const depart = document.getElementById('depart');
